@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>FLIGHT RADAR | 航空監視システム</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{color-scheme:dark;--bg:#07111f;--panel:#0d1b2b;--line:#20364d;--muted:#91a7bc;--cyan:#4bdcff;--green:#58e0a1;--amber:#ffcb70}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#eaf4ff;font:14px/1.5 system-ui,"Noto Sans JP",sans-serif}header{height:auto;min-height:66px;padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;background:#091625}h1{font-size:18px;letter-spacing:2px;margin:0}h1 span{color:var(--cyan)}.sub{font-size:10px;color:var(--muted);letter-spacing:1.5px}.status{display:flex;align-items:center;gap:7px;color:var(--green);font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}main{padding:12px;max-width:1600px;margin:auto}.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.toolbar input,.toolbar select,.toolbar button{background:#102338;border:1px solid #29445d;color:#eaf4ff;border-radius:7px;padding:9px 11px;font:inherit}.toolbar button{cursor:pointer}.toolbar button.primary{background:#07516a;border-color:#1687a6}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}.stat,.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}.stat{padding:10px 12px}.stat small{display:block;color:var(--muted);font-size:10px;letter-spacing:1px}.stat strong{font-size:22px;font-variant-numeric:tabular-nums}.layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:10px}.mapwrap{position:relative;min-height:520px;overflow:hidden}.panelhead{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;color:#b9d1e6;font-size:12px;letter-spacing:1px}#map{height:calc(100% - 40px);min-height:480px;background:#0b1a28}.side{display:flex;flex-direction:column;min-height:520px}.detail{padding:12px;border-bottom:1px solid var(--line);min-height:130px}.detail h2{margin:0 0 8px;font-size:16px;color:var(--cyan)}.kv{display:grid;grid-template-columns:1fr 1fr;gap:7px}.kv div{background:#091625;padding:7px;border-radius:6px}.kv small{display:block;color:var(--muted);font-size:10px}.kv b{font-variant-numeric:tabular-nums}.listtitle{padding:10px 12px;color:#b9d1e6;font-size:12px;border-bottom:1px solid var(--line)}#aircraftList{overflow:auto;max-height:430px}.aircraft{padding:9px 12px;border-bottom:1px solid #1b3044;cursor:pointer;display:flex;justify-content:space-between;gap:8px}.aircraft:hover,.aircraft.active{background:#15304a}.aircraft b{color:var(--cyan)}.aircraft small{display:block;color:var(--muted)}.aircraft .alt{text-align:right;color:#d8e8f6;font-variant-numeric:tabular-nums}.foot{color:var(--muted);font-size:11px;padding:12px 2px}.leaflet-container{background:#0b1a28}.plane{font-size:20px;color:#53d9ff;text-shadow:0 0 8px #00bfff;line-height:1}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#102338;color:#eaf4ff}.leaflet-control-attribution{font-size:9px!important}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.mapwrap{min-height:430px}#map{min-height:390px}.side{min-height:0}.stats{grid-template-columns:repeat(2,1fr)}#aircraftList{max-height:260px}}@media(max-width:430px){header{align-items:flex-start;flex-direction:column}.toolbar>*{flex:1 1 42%}.toolbar button{flex:1 1 auto}}
+</style>
+</head>
+<body>
+<header><div><h1><span>✈</span> FLIGHT RADAR</h1><div class="sub">LIVE AIR TRAFFIC SURVEILLANCE / JAPAN</div></div><div class="status"><i class="dot"></i><span id="connection">INITIALIZING</span></div></header>
+<main>
+<div class="toolbar">
+<input id="lat" type="number" step="0.1" value="35.9" aria-label="緯度" placeholder="緯度">
+<input id="lon" type="number" step="0.1" value="140.0" aria-label="経度" placeholder="経度">
+<select id="distance" aria-label="検索範囲"><option value="50">50 km</option><option value="100">100 km</option><option value="150" selected>150 km</option><option value="250">250 km</option></select>
+<button class="primary" id="search">この範囲を検索</button><button id="locate">現在地を中心にする</button><button id="refresh">更新</button><button id="full">全画面</button>
+</div>
+<div class="stats">
+<div class="stat"><small>検出航空機</small><strong id="count">--</strong></div>
+<div class="stat"><small>最高高度</small><strong id="maxalt">--</strong></div>
+<div class="stat"><small>最高速度</small><strong id="maxspeed">--</strong></div>
+<div class="stat"><small>最終更新</small><strong id="updated" style="font-size:16px">--:--:--</strong></div>
+</div>
+<div class="layout">
+<section class="panel mapwrap"><div class="panelhead"><span>TACTICAL AIRSPACE MAP</span><span id="rangeLabel">35.9N / 140.0E</span></div><div id="map"></div></section>
+<aside class="panel side"><div class="panelhead">AIRCRAFT INFORMATION</div><div class="detail" id="detail"><h2>航空機を選択</h2><span style="color:var(--muted)">地図上の航空機または一覧を選択してください。</span></div><div class="listtitle">検出リスト <span id="listCount">0</span></div><div id="aircraftList"><div style="padding:14px;color:var(--muted)">データを読み込み中…</div></div></aside>
+</div>
+<div class="foot">データ提供：adsb.lol（ADS-B受信データ）。受信状況・通信制限により表示されない航空機があります。位置や高度は参考情報であり、航行判断には使用しないでください。地図 © OpenStreetMap contributors.</div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id);let map,markers=[],aircraft=[],timer=null,selected=null;
+map=L.map('map',{zoomControl:true}).setView([35.9,140],7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(map);
+function n(v,d=0){return Number.isFinite(Number(v))?Number(v).toLocaleString('ja-JP',{maximumFractionDigits:d}):'--'}
+function planeIcon(track){return L.divIcon({className:'',html:'<div class="plane" style="transform:rotate('+(Number.isFinite(track)?track:0)+'deg)">✈</div>',iconSize:[24,24],iconAnchor:[12,12]})}
+function selectAircraft(a){selected=a.hex;const alt=a.alt_baro==='ground'?'地上':n(a.alt_baro)+' ft';$('detail').innerHTML='<h2>'+safe(a.flight||a.hex||'不明')+'</h2><div class="kv"><div><small>ICAO</small><b>'+safe(a.hex)+'</b></div><div><small>コールサイン</small><b>'+safe(a.flight||'--')+'</b></div><div><small>高度</small><b>'+alt+'</b></div><div><small>速度</small><b>'+n(a.gs)+' kt</b></div><div><small>方位</small><b>'+n(a.track)+'°</b></div><div><small>垂直速度</small><b>'+n(a.baro_rate)+' ft/min</b></div><div><small>緯度</small><b>'+n(a.lat,4)+'</b></div><div><small>経度</small><b>'+n(a.lon,4)+'</b></div></div>';document.querySelectorAll('.aircraft').forEach(x=>x.classList.toggle('active',x.dataset.hex===selected))}
+function safe(s){return String(s??'--').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function load(){const lat=Number($('lat').value),lon=Number($('lon').value),dist=Number($('distance').value);if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180){$('connection').textContent='座標エラー';return}
+$('connection').textContent='CONNECTING';$('rangeLabel').textContent=lat.toFixed(2)+'N / '+lon.toFixed(2)+'E · '+dist+' KM';
+try{const url='https://api.adsb.lol/v2/lat/'+lat+'/lon/'+lon+'/dist/'+dist;const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);const data=await res.json();aircraft=(data.aircraft||[]).filter(a=>Number.isFinite(a.lat)&&Number.isFinite(a.lon));render();$('connection').textContent='ONLINE';$('updated').textContent=new Date().toLocaleTimeString('ja-JP');}
+catch(e){$('connection').textContent='DATA ERROR';$('aircraftList').innerHTML='<div style="padding:14px;color:#ffcb70">航空データを取得できませんでした。時間をおいて再試行してください。<br><small>'+safe(e.message)+'</small></div>';}}
+function render(){markers.forEach(m=>map.removeLayer(m));markers=[];aircraft.forEach(a=>{const m=L.marker([a.lat,a.lon],{icon:planeIcon(a.track)}).addTo(map);m.bindTooltip(safe((a.flight||a.hex||'航空機').trim()));m.on('click',()=>selectAircraft(a));markers.push(m)});
+$('count').textContent=aircraft.length;$('listCount').textContent=aircraft.length;const alts=aircraft.map(a=>Number(a.alt_baro)).filter(Number.isFinite),speeds=aircraft.map(a=>Number(a.gs)).filter(Number.isFinite);$('maxalt').textContent=alts.length?n(Math.max(...alts))+' ft':'--';$('maxspeed').textContent=speeds.length?n(Math.max(...speeds))+' kt':'--';
+const sorted=[...aircraft].sort((a,b)=>(a.flight||a.hex||'').localeCompare(b.flight||b.hex||''));$('aircraftList').innerHTML=sorted.length?sorted.map(a=>'<div class="aircraft '+(a.hex===selected?'active':'')+'" data-hex="'+safe(a.hex)+'"><div><b>'+safe((a.flight||a.hex||'UNKNOWN').trim())+'</b><small>'+safe(a.hex)+' · '+safe(a.r||'')</small></div><div class="alt">'+(a.alt_baro==='ground'?'GROUND':n(a.alt_baro)+' ft')+'<small>'+n(a.gs)+' kt</small></div></div>').join(''):'<div style="padding:14px;color:var(--muted)">この範囲に航空機が見つかりません。</div>';
+document.querySelectorAll('.aircraft').forEach(el=>el.addEventListener('click',()=>{const a=aircraft.find(x=>x.hex===el.dataset.hex);if(a){selectAircraft(a);map.setView([a.lat,a.lon],Math.max(map.getZoom(),9))}}));if(selected){const a=aircraft.find(x=>x.hex===selected);if(a)selectAircraft(a)}}
+$('search').onclick=()=>{map.setView([Number($('lat').value),Number($('lon').value)],7);load()};$('refresh').onclick=load;$('locate').onclick=()=>{if(!navigator.geolocation){alert('このブラウザでは現在地を取得できません');return}navigator.geolocation.getCurrentPosition(p=>{$('lat').value=p.coords.latitude.toFixed(3);$('lon').value=p.coords.longitude.toFixed(3);$('search').click()},()=>alert('現在地を取得できませんでした。位置情報の許可を確認してください。'))};$('full').onclick=()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.()};
+load();timer=setInterval(load,30000);
+</script>
+</body></html>
