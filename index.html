@@ -16,9 +16,9 @@
 <header><div><h1><span>✈</span> FLIGHT RADAR</h1><div class="sub">LIVE AIR TRAFFIC SURVEILLANCE / JAPAN</div></div><div class="status"><i class="dot"></i><span id="connection">INITIALIZING</span></div></header>
 <main>
 <div class="toolbar">
-<input id="lat" type="number" step="0.1" value="35.9" aria-label="緯度" placeholder="緯度">
-<input id="lon" type="number" step="0.1" value="140.0" aria-label="経度" placeholder="経度">
-<select id="distance" aria-label="検索範囲"><option value="50">50 km</option><option value="100">100 km</option><option value="150" selected>150 km</option><option value="250">250 km</option></select>
+<input id="lat" type="number" step="0.1" value="36.2" aria-label="緯度" placeholder="緯度">
+<input id="lon" type="number" step="0.1" value="138.3" aria-label="経度" placeholder="経度">
+<select id="distance" aria-label="検索範囲"><option value="50">50 NM</option><option value="100">100 NM</option><option value="150">150 NM</option><option value="250" selected>250 NM</option></select>
 <button class="primary" id="search">この範囲を検索</button><button id="locate">現在地を中心にする</button><button id="refresh">更新</button><button id="full">全画面</button>
 </div>
 <div class="stats">
@@ -36,7 +36,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const $=id=>document.getElementById(id);let map,markers=[],aircraft=[],timer=null,selected=null;
-map=L.map('map',{zoomControl:true}).setView([35.9,140],7);
+map=L.map('map',{zoomControl:true}).setView([36.2,138.3],5.5);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(map);
 function n(v,d=0){return Number.isFinite(Number(v))?Number(v).toLocaleString('ja-JP',{maximumFractionDigits:d}):'--'}
 function planeIcon(track){return L.divIcon({className:'',html:'<div class="plane" style="transform:rotate('+(Number.isFinite(track)?track:0)+'deg)">✈</div>',iconSize:[24,24],iconAnchor:[12,12]})}
@@ -44,13 +44,13 @@ function selectAircraft(a){selected=a.hex;const alt=a.alt_baro==='ground'?'地�
 function safe(s){return String(s??'--').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function load(){const lat=Number($('lat').value),lon=Number($('lon').value),dist=Number($('distance').value);if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180){$('connection').textContent='座標エラー';return}
 $('connection').textContent='CONNECTING';$('rangeLabel').textContent=lat.toFixed(2)+'N / '+lon.toFixed(2)+'E · '+dist+' KM';
-try{const url='https://api.adsb.lol/v2/lat/'+lat+'/lon/'+lon+'/dist/'+dist;const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);const data=await res.json();aircraft=(data.aircraft||[]).filter(a=>Number.isFinite(a.lat)&&Number.isFinite(a.lon));render();$('connection').textContent='ONLINE';$('updated').textContent=new Date().toLocaleTimeString('ja-JP');}
+try{const url='https://api.adsb.lol/v2/lat/'+lat+'/lon/'+lon+'/dist/'+dist;const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);const data=await res.json();aircraft=(data.aircraft||data.ac||[]).filter(a=>Number.isFinite(a.lat)&&Number.isFinite(a.lon));render();$('connection').textContent='ONLINE';$('updated').textContent=new Date().toLocaleTimeString('ja-JP');}
 catch(e){$('connection').textContent='DATA ERROR';$('aircraftList').innerHTML='<div style="padding:14px;color:#ffcb70">航空データを取得できませんでした。時間をおいて再試行してください。<br><small>'+safe(e.message)+'</small></div>';}}
 function render(){markers.forEach(m=>map.removeLayer(m));markers=[];aircraft.forEach(a=>{const m=L.marker([a.lat,a.lon],{icon:planeIcon(a.track)}).addTo(map);m.bindTooltip(safe((a.flight||a.hex||'航空機').trim()));m.on('click',()=>selectAircraft(a));markers.push(m)});
 $('count').textContent=aircraft.length;$('listCount').textContent=aircraft.length;const alts=aircraft.map(a=>Number(a.alt_baro)).filter(Number.isFinite),speeds=aircraft.map(a=>Number(a.gs)).filter(Number.isFinite);$('maxalt').textContent=alts.length?n(Math.max(...alts))+' ft':'--';$('maxspeed').textContent=speeds.length?n(Math.max(...speeds))+' kt':'--';
 const sorted=[...aircraft].sort((a,b)=>(a.flight||a.hex||'').localeCompare(b.flight||b.hex||''));$('aircraftList').innerHTML=sorted.length?sorted.map(a=>'<div class="aircraft '+(a.hex===selected?'active':'')+'" data-hex="'+safe(a.hex)+'"><div><b>'+safe((a.flight||a.hex||'UNKNOWN').trim())+'</b><small>'+safe(a.hex)+' · '+safe(a.r||'')</small></div><div class="alt">'+(a.alt_baro==='ground'?'GROUND':n(a.alt_baro)+' ft')+'<small>'+n(a.gs)+' kt</small></div></div>').join(''):'<div style="padding:14px;color:var(--muted)">この範囲に航空機が見つかりません。</div>';
 document.querySelectorAll('.aircraft').forEach(el=>el.addEventListener('click',()=>{const a=aircraft.find(x=>x.hex===el.dataset.hex);if(a){selectAircraft(a);map.setView([a.lat,a.lon],Math.max(map.getZoom(),9))}}));if(selected){const a=aircraft.find(x=>x.hex===selected);if(a)selectAircraft(a)}}
 $('search').onclick=()=>{map.setView([Number($('lat').value),Number($('lon').value)],7);load()};$('refresh').onclick=load;$('locate').onclick=()=>{if(!navigator.geolocation){alert('このブラウザでは現在地を取得できません');return}navigator.geolocation.getCurrentPosition(p=>{$('lat').value=p.coords.latitude.toFixed(3);$('lon').value=p.coords.longitude.toFixed(3);$('search').click()},()=>alert('現在地を取得できませんでした。位置情報の許可を確認してください。'))};$('full').onclick=()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.()};
-load();timer=setInterval(load,30000);
+load();timer=setInterval(load,300000);
 </script>
 </body></html>
